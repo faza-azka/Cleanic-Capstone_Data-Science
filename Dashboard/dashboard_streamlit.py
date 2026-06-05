@@ -14,6 +14,8 @@ from PIL import Image
 import plotly.graph_objects as go
 import plotly.express as px
 from collections import defaultdict
+import gdown
+import zipfile
 
 # ============================================================================
 # PAGE CONFIGURATION
@@ -56,6 +58,10 @@ BASE_DIR = Path(__file__).parent
 DATASET_PATH = BASE_DIR / "data"  # Relative to script location
 FINAL_PATH = DATASET_PATH / "dataset_selesai_olah"
 REPORTS_PATH = DATASET_PATH / "reports"
+
+# Google Drive Configuration
+GOOGLE_DRIVE_DATASET_ID = st.secrets.get("GOOGLE_DRIVE_DATASET_ID", "")
+ENABLE_CLOUD_DOWNLOAD = GOOGLE_DRIVE_DATASET_ID != ""
 
 # For local testing, check actual dataset location
 LOCAL_DATASET_PATH = Path(r"C:\Kuliah\SMT 6\Dicoding\capstone\dataset_selesai_olah\dataset_selesai_olah")
@@ -120,6 +126,34 @@ class_meta = {
 # ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
+
+def download_dataset_from_gdrive():
+    """Download dataset from Google Drive"""
+    if not ENABLE_CLOUD_DOWNLOAD:
+        return False
+    
+    try:
+        DATASET_PATH.mkdir(parents=True, exist_ok=True)
+        st.info("📥 Downloading dataset from Google Drive...")
+        
+        zip_path = DATASET_PATH / "dataset.zip"
+        gdown.download(
+            f"https://drive.google.com/uc?id={GOOGLE_DRIVE_DATASET_ID}",
+            str(zip_path),
+            quiet=False
+        )
+        
+        st.info("📦 Extracting dataset...")
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(DATASET_PATH)
+        
+        zip_path.unlink()
+        st.success("✅ Dataset downloaded and extracted successfully!")
+        return True
+        
+    except Exception as e:
+        st.error(f"❌ Error downloading dataset: {str(e)}")
+        return False
 
 def get_demo_stats():
     """Generate demo dataset statistics for preview"""
@@ -355,22 +389,37 @@ for cls in CLASSES:
 # ============================================================================
 stats = load_dataset_stats()
 
-# Check if dataset exists - if not, use demo mode
+# Check if dataset exists - if not, offer options
 if stats['total'] == 0:
     st.warning(
-        "⚠️ **Dataset Tidak Ditemukan - Menggunakan Mode Demo**\n\n"
-        f"Lokasi yang dicari: `{FINAL_PATH}`\n\n"
-        "**Untuk Setup Lokal:**\n"
-        "- Buat folder structure: `data/dataset_selesai_olah/train|val|test/[classes]/`\n"
-        "- Copy gambar ke folder yang sesuai\n"
-        "- Refresh halaman\n\n"
-        "**Saat Ini:**\n"
-        "- Dashboard menampilkan data **DEMO** (nilai realistis)\n"
-        "- Fitur **preview gambar** tidak tersedia\n"
-        "- Semua chart dan statistik menggunakan sample data"
+        "⚠️ **Dataset Tidak Ditemukan**\n\n"
+        f"Lokasi yang dicari: `{FINAL_PATH}`"
     )
-    stats = get_demo_stats()
-    DEMO_MODE = True
+    
+    # Offer cloud download if configured
+    if ENABLE_CLOUD_DOWNLOAD:
+        st.info("💡 **Dataset tersedia di Google Drive!** Klik tombol di bawah untuk download.")
+        if st.button("📥 Download Dataset dari Google Drive", key="download_btn"):
+            if download_dataset_from_gdrive():
+                st.rerun()
+        DEMO_MODE = True
+    else:
+        st.info(
+            "**Opsi:**\n\n"
+            "1️⃣ **Download dari Cloud**: "
+            "Upload dataset ke Google Drive, dapatkan FILE_ID, dan set di secrets\n\n"
+            "2️⃣ **Setup Lokal**: "
+            "Buat folder `data/dataset_selesai_olah/train|val|test/[classes]/` dan copy gambar\n\n"
+            "3️⃣ **Demo Mode**: Dashboard akan tampilkan data sample"
+        )
+        st.info(
+            "📌 **Untuk Google Drive:**\n"
+            "- Upload dataset ZIP ke Google Drive\n"
+            "- Copy FILE_ID dari URL: `https://drive.google.com/file/d/{FILE_ID}/view`\n"
+            "- Add ke `.streamlit/secrets.toml`:\n```\nGOOGLE_DRIVE_DATASET_ID = 'YOUR_FILE_ID'\n```"
+        )
+        stats = get_demo_stats()
+        DEMO_MODE = True
 else:
     DEMO_MODE = False
 
