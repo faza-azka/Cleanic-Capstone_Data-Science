@@ -237,16 +237,20 @@ def create_class_distribution_chart(stats):
     """Create interactive class distribution chart"""
     df_data = []
     for cls in CLASSES:
-        if cls in stats['by_class']:
-            total = stats['by_class'][cls]['total']
-            df_data.append({
-                'Kelas': cls,
-                'Jumlah': total,
-                'Warna': class_meta[cls]['warna']
-            })
+        total = stats['by_class'].get(cls, {}).get('total', 0)
+        df_data.append({
+            'Kelas': cls,
+            'Jumlah': total,
+        })
     
     df = pd.DataFrame(df_data)
     
+    # Guard: if somehow still empty, return blank figure
+    if df.empty or 'Jumlah' not in df.columns:
+        fig = go.Figure()
+        fig.update_layout(title='📊 Distribusi Jumlah Gambar per Kelas (No Data)', height=400)
+        return fig
+
     fig = px.bar(
         df,
         x='Kelas',
@@ -453,7 +457,7 @@ if page == "🏠 Dashboard Utama":
         st.metric(
             label="🚂 Training Set",
             value=f"{stats['by_split']['train']:,}",
-            delta=f"{train_pct:.1f}%"
+            delta=f"{train_pct:.1f}%" if stats['total'] > 0 else "No data"
         )
     
     with col4:
