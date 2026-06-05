@@ -305,11 +305,11 @@ def create_stacked_bar_chart(stats):
     }
     
     for cls in CLASSES:
-        if cls in stats['by_class']:
-            data['Kelas'].append(cls)
-            data['Train'].append(stats['by_class'][cls]['train'])
-            data['Val'].append(stats['by_class'][cls]['val'])
-            data['Test'].append(stats['by_class'][cls]['test'])
+        cls_data = stats['by_class'].get(cls, {'train': 0, 'val': 0, 'test': 0})
+        data['Kelas'].append(cls)
+        data['Train'].append(cls_data.get('train', 0))
+        data['Val'].append(cls_data.get('val', 0))
+        data['Test'].append(cls_data.get('test', 0))
     
     df = pd.DataFrame(data)
     
@@ -333,16 +333,15 @@ def create_balance_status_chart(stats):
     """Create data balance status visualization"""
     data = []
     for cls in CLASSES:
-        if cls in stats['by_class']:
-            total = stats['by_class'][cls]['total']
-            balance_pct = (total / TARGET_PER_CLASS) * 100
-            data.append({
-                'Kelas': cls,
-                'Persentase': balance_pct,
-                'Total': total,
-                'Status': '✅ Balanced' if balance_pct >= 95 else '⚠️ Imbalanced'
-            })
-    
+        total = stats['by_class'].get(cls, {}).get('total', 0)
+        balance_pct = (total / TARGET_PER_CLASS) * 100
+        data.append({
+            'Kelas': cls,
+            'Persentase': balance_pct,
+            'Total': total,
+            'Status': '✅ Balanced' if balance_pct >= 95 else '⚠️ Imbalanced'
+        })
+
     df = pd.DataFrame(data)
     
     fig = px.bar(
