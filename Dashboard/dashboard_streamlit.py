@@ -51,9 +51,18 @@ st.markdown("""
 # ============================================================================
 # CONFIGURATION & PATHS
 # ============================================================================
-DATASET_PATH = r"D:\kuliah\semester_6\stupen\capstone\dataset"
-FINAL_PATH = os.path.join(DATASET_PATH, "dataset_selesai_olah")
-REPORTS_PATH = os.path.join(DATASET_PATH, "reports")
+# Use relative path for deployment compatibility
+BASE_DIR = Path(__file__).parent
+DATASET_PATH = BASE_DIR / "data"  # Relative to script location
+FINAL_PATH = DATASET_PATH / "dataset_selesai_olah"
+REPORTS_PATH = DATASET_PATH / "reports"
+
+# For local testing, also check absolute path if relative doesn't exist
+if not FINAL_PATH.exists():
+    LOCAL_DATASET_PATH = Path(r"D:\kuliah\semester_6\stupen\capstone\dataset")
+    if LOCAL_DATASET_PATH.exists():
+        FINAL_PATH = LOCAL_DATASET_PATH / "dataset_selesai_olah"
+        REPORTS_PATH = LOCAL_DATASET_PATH / "reports"
 
 # Configuration
 TARGET_PER_CLASS = 3000
@@ -103,6 +112,43 @@ class_meta = {
 # ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
+
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
+
+def get_demo_stats():
+    """Generate demo dataset statistics for preview"""
+    demo_stats = {
+        'by_class': {},
+        'by_split': {'train': 0, 'val': 0, 'test': 0},
+        'total': 0
+    }
+    
+    # Demo data: realistic values
+    demo_distribution = {
+        'b3': {'train': 2400, 'val': 400, 'test': 200},
+        'kaca': {'train': 2850, 'val': 100, 'test': 50},
+        'kertas': {'train': 2950, 'val': 40, 'test': 10},
+        'logam': {'train': 2500, 'val': 400, 'test': 100},
+        'organik': {'train': 2800, 'val': 150, 'test': 50},
+        'plastik': {'train': 2900, 'val': 80, 'test': 20}
+    }
+    
+    for cls, splits in demo_distribution.items():
+        total = sum(splits.values())
+        demo_stats['by_class'][cls] = {
+            'train': splits['train'],
+            'val': splits['val'],
+            'test': splits['test'],
+            'total': total
+        }
+        demo_stats['by_split']['train'] += splits['train']
+        demo_stats['by_split']['val'] += splits['val']
+        demo_stats['by_split']['test'] += splits['test']
+    
+    demo_stats['total'] = sum(demo_stats['by_split'].values())
+    return demo_stats
 
 @st.cache_data
 def load_dataset_stats():
@@ -305,6 +351,25 @@ for cls in CLASSES:
 # ============================================================================
 stats = load_dataset_stats()
 
+# Check if dataset exists - if not, use demo mode
+if stats['total'] == 0:
+    st.warning(
+        "⚠️ **Dataset Tidak Ditemukan - Menggunakan Mode Demo**\n\n"
+        f"Lokasi yang dicari: `{FINAL_PATH}`\n\n"
+        "**Untuk Setup Lokal:**\n"
+        "- Buat folder structure: `data/dataset_selesai_olah/train|val|test/[classes]/`\n"
+        "- Copy gambar ke folder yang sesuai\n"
+        "- Refresh halaman\n\n"
+        "**Saat Ini:**\n"
+        "- Dashboard menampilkan data **DEMO** (nilai realistis)\n"
+        "- Fitur **preview gambar** tidak tersedia\n"
+        "- Semua chart dan statistik menggunakan sample data"
+    )
+    stats = get_demo_stats()
+    DEMO_MODE = True
+else:
+    DEMO_MODE = False
+
 # ============================================================================
 # PAGE: DASHBOARD UTAMA
 # ============================================================================
@@ -331,7 +396,7 @@ if page == "🏠 Dashboard Utama":
         )
     
     with col3:
-        train_pct = (stats['by_split']['train'] / stats['total']) * 100
+        train_pct = (stats['by_split']['train'] / stats['total'] * 100) if stats['total'] > 0 else 0
         st.metric(
             label="🚂 Training Set",
             value=f"{stats['by_split']['train']:,}",
@@ -417,7 +482,8 @@ elif page == "📊 Analisis Detail":
     
     with col1:
         train_count = stats['by_class'][selected_class]['train']
-        train_pct = (train_count / stats['by_class'][selected_class]['total']) * 100
+        total_count = stats['by_class'][selected_class]['total']
+        train_pct = (train_count / total_count * 100) if total_count > 0 else 0
         st.metric(
             label="🚂 Training",
             value=f"{train_count:,}",
@@ -426,7 +492,8 @@ elif page == "📊 Analisis Detail":
     
     with col2:
         val_count = stats['by_class'][selected_class]['val']
-        val_pct = (val_count / stats['by_class'][selected_class]['total']) * 100
+        total_count = stats['by_class'][selected_class]['total']
+        val_pct = (val_count / total_count * 100) if total_count > 0 else 0
         st.metric(
             label="✔️ Validation",
             value=f"{val_count:,}",
@@ -435,7 +502,8 @@ elif page == "📊 Analisis Detail":
     
     with col3:
         test_count = stats['by_class'][selected_class]['test']
-        test_pct = (test_count / stats['by_class'][selected_class]['total']) * 100
+        total_count = stats['by_class'][selected_class]['total']
+        test_pct = (test_count / total_count * 100) if total_count > 0 else 0
         st.metric(
             label="🧪 Test",
             value=f"{test_count:,}",
@@ -494,17 +562,26 @@ elif page == "🖼️ Data Samples":
     
     st.markdown("---")
     
-    # Display samples
-    images = get_sample_images(selected_class_sample, selected_split, count=6)
-    
-    if images:
-        cols = st.columns(3)
-        for idx, (fname, img) in enumerate(images):
-            with cols[idx % 3]:
-                st.image(img, caption=fname, use_column_width=True)
-                st.caption(f"Size: {img.size[0]}x{img.size[1]}")
+    # Display samples or demo message
+    if DEMO_MODE:
+        st.info(
+            "📌 **Mode Demo - Preview Gambar Tidak Tersedia**\n\n"
+            "Untuk melihat preview gambar nyata:\n"
+            "1. Setup dataset lokal dengan struktur folder yang benar\n"
+            "2. Refresh dashboard\n\n"
+            "Dataset akan ditampilkan otomatis saat tersedia."
+        )
     else:
-        st.warning(f"❌ Tidak ada gambar ditemukan untuk kelas {selected_class_sample} di split {selected_split}")
+        images = get_sample_images(selected_class_sample, selected_split, count=6)
+        
+        if images:
+            cols = st.columns(3)
+            for idx, (fname, img) in enumerate(images):
+                with cols[idx % 3]:
+                    st.image(img, caption=fname, use_column_width=True)
+                    st.caption(f"Size: {img.size[0]}x{img.size[1]}")
+        else:
+            st.warning(f"❌ Tidak ada gambar ditemukan untuk kelas {selected_class_sample} di split {selected_split}")
 
 # ============================================================================
 # PAGE: STATISTIK PIPELINE
@@ -526,7 +603,7 @@ elif page == "📈 Statistik Pipeline":
         )
     
     with col2:
-        avg_per_class = stats['total'] / len(CLASSES)
+        avg_per_class = (stats['total'] / len(CLASSES)) if len(CLASSES) > 0 else 0
         st.metric(
             label="Rata-rata per Kelas",
             value=f"{avg_per_class:,.0f}",
@@ -534,7 +611,10 @@ elif page == "📈 Statistik Pipeline":
         )
     
     with col3:
-        imbalance_ratio = max([stats['by_class'][c]['total'] for c in CLASSES]) / min([stats['by_class'][c]['total'] for c in CLASSES])
+        class_totals = [stats['by_class'][c]['total'] for c in CLASSES]
+        max_total = max(class_totals) if class_totals else 1
+        min_total = min(class_totals) if class_totals else 1
+        imbalance_ratio = max_total / min_total if min_total > 0 else 1.0
         st.metric(
             label="Imbalance Ratio",
             value=f"{imbalance_ratio:.2f}x",
