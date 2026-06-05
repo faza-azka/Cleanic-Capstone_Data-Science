@@ -57,12 +57,16 @@ DATASET_PATH = BASE_DIR / "data"  # Relative to script location
 FINAL_PATH = DATASET_PATH / "dataset_selesai_olah"
 REPORTS_PATH = DATASET_PATH / "reports"
 
-# For local testing, also check absolute path if relative doesn't exist
+# For local testing, check actual dataset location
+LOCAL_DATASET_PATH = Path(r"C:\Kuliah\SMT 6\Dicoding\capstone\dataset_selesai_olah\dataset_selesai_olah")
+if LOCAL_DATASET_PATH.exists():
+    FINAL_PATH = LOCAL_DATASET_PATH
+    
+# Fallback to alternative path if above doesn't exist
 if not FINAL_PATH.exists():
-    LOCAL_DATASET_PATH = Path(r"D:\kuliah\semester_6\stupen\capstone\dataset")
-    if LOCAL_DATASET_PATH.exists():
-        FINAL_PATH = LOCAL_DATASET_PATH / "dataset_selesai_olah"
-        REPORTS_PATH = LOCAL_DATASET_PATH / "reports"
+    ALT_PATH = Path(r"D:\kuliah\semester_6\stupen\capstone\dataset\dataset_selesai_olah")
+    if ALT_PATH.exists():
+        FINAL_PATH = ALT_PATH
 
 # Configuration
 TARGET_PER_CLASS = 3000
